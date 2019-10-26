@@ -8,8 +8,9 @@
 
 import Foundation
 
-let SS_LOCAL_VERSION = "3.1.3"
-let KCPTUN_CLIENT_VERSION = "v20170718"
+let SS_LOCAL_VERSION = "3.2.5"
+let KCPTUN_CLIENT_VERSION = "v20190905"
+let V2RAY_PLUGIN_VERSION = "1.1.0"
 let PRIVOXY_VERSION = "3.0.26.static"
 let SIMPLE_OBFS_VERSION = "0.0.5_1"
 let APP_SUPPORT_DIR = "/Library/Application Support/ShadowsocksX-NG/"
@@ -128,7 +129,14 @@ func InstallSSLocal() {
 func writeSSLocalConfFile(_ conf:[String:AnyObject]) -> Bool {
     do {
         let filepath = NSHomeDirectory() + APP_SUPPORT_DIR + "ss-local-config.json"
-        let data: Data = try JSONSerialization.data(withJSONObject: conf, options: .prettyPrinted)
+        var data: Data = try JSONSerialization.data(withJSONObject: conf, options: .prettyPrinted)
+
+        // https://github.com/shadowsocks/ShadowsocksX-NG/issues/1104
+        // This is NSJSONSerialization.dataWithJSONObject that likes to insert additional backslashes.
+        // Escaped forward slashes is also valid json.
+        // Workaround:
+        let s = String(data:data, encoding: .utf8)!
+        data = s.replacingOccurrences(of: "\\/", with: "/").data(using: .utf8)!
         
         let oldSum = getFileSHA1Sum(filepath)
         try data.write(to: URL(fileURLWithPath: filepath), options: .atomic)
@@ -217,7 +225,7 @@ func InstallKcptun() {
     let fileMgr = FileManager.default
     let homeDir = NSHomeDirectory()
     let appSupportDir = homeDir+APP_SUPPORT_DIR
-    if !fileMgr.fileExists(atPath: appSupportDir + "kcptun_\(KCPTUN_CLIENT_VERSION)/kcptun_client") {
+    if !fileMgr.fileExists(atPath: appSupportDir + "kcptun_\(KCPTUN_CLIENT_VERSION)/client") {
         let bundle = Bundle.main
         let installerPath = bundle.path(forResource: "install_kcptun", ofType: "sh")
         let task = Process.launchedProcess(launchPath: "/bin/sh", arguments: [installerPath!])
@@ -226,6 +234,26 @@ func InstallKcptun() {
             NSLog("Install kcptun succeeded.")
         } else {
             NSLog("Install kcptun failed.")
+        }
+    }
+}
+
+// --------------------------------------------------------------------------------
+//  MARK: v2ray-plugin
+
+func InstallV2rayPlugin() {
+    let fileMgr = FileManager.default
+    let homeDir = NSHomeDirectory()
+    let appSupportDir = homeDir+APP_SUPPORT_DIR
+    if !fileMgr.fileExists(atPath: appSupportDir + "v2ray-plugin_\(V2RAY_PLUGIN_VERSION)/v2ray-plugin") {
+        let bundle = Bundle.main
+        let installerPath = bundle.path(forResource: "install_v2ray_plugin", ofType: "sh")
+        let task = Process.launchedProcess(launchPath: "/bin/sh", arguments: [installerPath!])
+        task.waitUntilExit()
+        if task.terminationStatus == 0 {
+            NSLog("Install v2ray-plugin succeeded.")
+        } else {
+            NSLog("Install v2ray-plugin failed.")
         }
     }
 }

@@ -84,6 +84,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCenterDele
         InstallPrivoxy()
         InstallSimpleObfs()
         InstallKcptun()
+        InstallV2rayPlugin()
         
         // Prepare defaults
         let defaults = UserDefaults.standard
@@ -92,6 +93,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCenterDele
             "ShadowsocksRunningMode": "auto",
             "LocalSocks5.ListenPort": NSNumber(value: 1086 as UInt16),
             "LocalSocks5.ListenAddress": "127.0.0.1",
+            "PacServer.ListenAddress":"127.0.0.1",
             "PacServer.ListenPort":NSNumber(value: 1089 as UInt16),
             "LocalSocks5.Timeout": NSNumber(value: 60 as UInt),
             "LocalSocks5.EnableUDPRelay": NSNumber(value: false as Bool),
@@ -101,7 +103,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCenterDele
             "LocalHTTP.ListenAddress": "127.0.0.1",
             "LocalHTTP.ListenPort": NSNumber(value: 1087 as UInt16),
             "LocalHTTPOn": true,
-            "LocalHTTP.FollowGlobal": true,
+            "LocalHTTP.FollowGlobal": false,
             "ProxyExceptions": "127.0.0.1, localhost, 192.168.0.0/16, 10.0.0.0/8, FE80::/64, ::1, FD00::/8",
             ])
         
@@ -148,6 +150,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCenterDele
                     defaults.setValue("global", forKey: "ShadowsocksRunningMode")
                     toastMessage = "Global Mode".localized
                 case "global":
+                    defaults.setValue("manual", forKey: "ShadowsocksRunningMode")
+                    toastMessage = "Manual Mode".localized
+                case "manual":
                     defaults.setValue("auto", forKey: "ShadowsocksRunningMode")
                     toastMessage = "Auto Mode By PAC".localized
                 default:
@@ -482,12 +487,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCenterDele
         let isOn = defaults.bool(forKey: "ShadowsocksOn")
         if isOn {
             runningStatusMenuItem.title = "Shadowsocks: On".localized
+            runningStatusMenuItem.image = NSImage(named: NSImage.Name(rawValue: "NSStatusAvailable"))
             toggleRunningMenuItem.title = "Turn Shadowsocks Off".localized
             let image = NSImage(named: NSImage.Name(rawValue: "menu_icon"))
             statusItem.image = image
         } else {
             runningStatusMenuItem.title = "Shadowsocks: Off".localized
             toggleRunningMenuItem.title = "Turn Shadowsocks On".localized
+            runningStatusMenuItem.image = NSImage(named: NSImage.Name(rawValue: "NSStatusNone"))
             let image = NSImage(named: NSImage.Name(rawValue: "menu_icon_disabled"))
             statusItem.image = image
         }

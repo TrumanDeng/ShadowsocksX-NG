@@ -153,19 +153,21 @@ GCDWebServer *webServer =nil;
 }
 
 + (void)enableGlobalProxy {
+    NSString* socks5ListenAddress = [[NSUserDefaults standardUserDefaults]stringForKey:@"LocalSocks5.ListenAddress"];
     NSUInteger port = [[NSUserDefaults standardUserDefaults]integerForKey:@"LocalSocks5.ListenPort"];
     
     NSMutableArray* args = [@[@"--mode", @"global", @"--port"
-                              , [NSString stringWithFormat:@"%lu", (unsigned long)port]]mutableCopy];
+                              , [NSString stringWithFormat:@"%lu", (unsigned long)port],@"--socks-listen-address",socks5ListenAddress]mutableCopy];
     
-    // Because issue #106 https://github.com/shadowsocks/ShadowsocksX-NG/issues/106
-    // Comment below out.
-//    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"LocalHTTPOn"] && [[NSUserDefaults standardUserDefaults] boolForKey:@"LocalHTTP.FollowGlobal"]) {
-//        NSUInteger privoxyPort = [[NSUserDefaults standardUserDefaults]integerForKey:@"LocalHTTP.ListenPort"];
-//
-//        [args addObject:@"--privoxy-port"];
-//        [args addObject:[NSString stringWithFormat:@"%lu", (unsigned long)privoxyPort]];
-//    }
+    // Known issue #106 https://github.com/shadowsocks/ShadowsocksX-NG/issues/106
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"LocalHTTPOn"] && [[NSUserDefaults standardUserDefaults] boolForKey:@"LocalHTTP.FollowGlobal"]) {
+        NSUInteger privoxyPort = [[NSUserDefaults standardUserDefaults]integerForKey:@"LocalHTTP.ListenPort"];
+        NSString* privoxyListenAddress = [[NSUserDefaults standardUserDefaults]stringForKey:@"LocalHTTP.ListenAddress"];
+        [args addObject:@"--privoxy-port"];
+        [args addObject:[NSString stringWithFormat:@"%lu", (unsigned long)privoxyPort]];
+        [args addObject:@"--privoxy-listen-address"];
+        [args addObject:privoxyListenAddress];
+    }
     
     [self addArguments4ManualSpecifyNetworkServices:args];
     [self addArguments4ManualSpecifyProxyExceptions:args];
@@ -193,7 +195,7 @@ GCDWebServer *webServer =nil;
     
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
 
-    NSString * address = @"127.0.0.1";
+    NSString * address = [defaults stringForKey:@"PacServer.ListenAddress"];
     int port = (short)[defaults integerForKey:@"PacServer.ListenPort"];
     
     return [NSString stringWithFormat:@"%@%@:%d%@",@"http://",address,port,routerPath];
@@ -207,6 +209,8 @@ GCDWebServer *webServer =nil;
     NSData* originalPACData = [NSData dataWithContentsOfFile:PACFilePath];
     
     webServer = [[GCDWebServer alloc] init];
+    
+
     [webServer addHandlerForMethod:@"GET"
                               path:routerPath
                       requestClass:[GCDWebServerRequest class]
@@ -220,9 +224,10 @@ GCDWebServer *webServer =nil;
     
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     
+    NSString * address = [defaults stringForKey:@"PacServer.ListenAddress"];
     int port = (short)[defaults integerForKey:@"PacServer.ListenPort"];
     
-    [webServer startWithOptions:@{@"BindToLocalhost":@YES, @"Port":@(port)} error:nil];
+    [webServer startWithOptions:@{@"ServerName":address,@"Port":@(port)} error:nil];
 }
 
 + (void)stopPACServer {
@@ -245,13 +250,16 @@ GCDWebServer *webServer =nil;
                                           if(flags & DISPATCH_VNODE_DELETE)
                                           {
                                               dispatch_source_cancel(source);
-                                          } else {
-                                              NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
-                                              if ([defaults boolForKey:@"ShadowsocksOn"]) {
-                                                  if ([[defaults stringForKey:@"ShadowsocksRunningMode"] isEqualToString:@"auto"]) {
-                                                      [ProxyConfHelper disableProxy];
-                                                      [ProxyConfHelper enablePACProxy];
-                                                  }
+                                          }
+                                          
+                                          // The PAC file was written by atomically (PACUtils.swift:134)
+                                          // That means DISPATCH_VNODE_DELETE event always be trigged
+                                          // Need to be run the following statements in any events
+                                          NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+                                          if ([defaults boolForKey:@"ShadowsocksOn"]) {
+                                              if ([[defaults stringForKey:@"ShadowsocksRunningMode"] isEqualToString:@"auto"]) {
+                                                  [ProxyConfHelper disableProxy];
+                                                  [ProxyConfHelper enablePACProxy];
                                               }
                                           }
                                       });
